@@ -139,8 +139,13 @@ function render_discord_notify(array $m, string $tab): void
 <form method="post" class="discord-notify row-form tight">
   <?= form_base('discord_notify', $tab) ?>
   <input type="hidden" name="match_id" value="<?= (int) $m['id'] ?>">
-  <input name="message" class="grow" maxlength="1500" placeholder="Message to <?= e($m['team1_name']) ?> &amp; <?= e($m['team2_name']) ?> on Discord, e.g. map ban link" aria-label="Discord message to both teams">
-  <button class="btn small ghost" title="Sends to both teams' Discord channels and pings their roles">📣 Send</button>
+  <input name="message" class="grow" maxlength="1500" placeholder="Discord message, e.g. map ban link" aria-label="Discord message">
+  <select name="to" aria-label="Send to">
+    <option value="both">Both teams</option>
+    <option value="team1">Only <?= e($m['team1_name']) ?></option>
+    <option value="team2">Only <?= e($m['team2_name']) ?></option>
+  </select>
+  <button class="btn small ghost" title="Sends to the team channels and pings the team roles">📣 Send</button>
 </form>
 <?php
 }

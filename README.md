@@ -53,7 +53,7 @@ What is sent, and when:
 | Event | Where | Setting |
 |---|---|---|
 | Match set **▶ Live** | both teams' channels, pinging each team role | *When a match goes Live* |
-| **📣 Send** under a match | both teams' channels (free text, e.g. map ban link) | always available |
+| **📣 Send** under a match | both teams' channels, or only one team (free text, e.g. map ban link or side info) | always available |
 | Match **✓ Finished** | results channel (or the bot's default channel) | *When a match is Finished* |
 | Final finished | results channel, `@here` | *Announce the champion* |
 

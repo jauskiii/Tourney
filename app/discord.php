@@ -232,11 +232,19 @@ function discord_match_line(array $m): string
     return implode(' · ', $parts);
 }
 
-/** Both teams of a match, on their own team channels, each pinging its own role. */
-function discord_to_teams(array $tournament, array $m, string $title, string $body, string $color): array
+/**
+ * Teams of a match ($to = 'both', 'team1' or 'team2'), on their own team channels,
+ * each pinging its own role.
+ */
+function discord_to_teams(array $tournament, array $m, string $title, string $body, string $color, string $to = 'both'): array
 {
+    $teams = match ($to) {
+        'team1' => [$m['team1_name']],
+        'team2' => [$m['team2_name']],
+        default => [$m['team1_name'], $m['team2_name']],
+    };
     $payload = [
-        'teams'   => [$m['team1_name'], $m['team2_name']],
+        'teams'   => $teams,
         'mention' => 'team',
         'title'   => $title,
         'body'    => $body,
@@ -248,11 +256,20 @@ function discord_to_teams(array $tournament, array $m, string $title, string $bo
     return discord_announce($payload);
 }
 
-/** Free-text message to both teams of a match (e.g. a map ban link). */
-function discord_notify_match(array $tournament, array $m, string $message): array
+/**
+ * Free-text message about a match (e.g. a map ban link) to both teams, or only one:
+ * $to = 'both', 'team1' or 'team2'.
+ */
+function discord_notify_match(array $tournament, array $m, string $message, string $to = 'both'): array
 {
     $body = trim($message) . "\n\n" . discord_match_line($m) . "\n*" . $tournament['name'] . '*';
-    return discord_to_teams($tournament, $m, '📣 ' . $m['team1_name'] . ' vs ' . $m['team2_name'], $body, '#5865f2');
+    // A message for one team says who it is for, so it can't be mistaken for a shared one.
+    $title = match ($to) {
+        'team1' => '📣 ' . $m['team1_name'] . ' (vs ' . $m['team2_name'] . ')',
+        'team2' => '📣 ' . $m['team2_name'] . ' (vs ' . $m['team1_name'] . ')',
+        default => '📣 ' . $m['team1_name'] . ' vs ' . $m['team2_name'],
+    };
+    return discord_to_teams($tournament, $m, $title, $body, '#5865f2', $to);
 }
 
 /**

@@ -274,11 +274,18 @@ function handle_admin_action(array $tournament): never
             case 'discord_notify':
                 $matchId = require_owned('matches', post_int('match_id'), $tid);
                 $message = post_str('message', 1500);
+                $to = in_array($_POST['to'] ?? '', ['team1', 'team2'], true) ? (string) $_POST['to'] : 'both';
                 if ($message === '') {
                     flash('Write a message first (e.g. the map ban link).', 'error');
                 } else {
-                    $r = discord_notify_match($tournament, get_match($tid, $matchId), $message);
-                    flash($r['ok'] ? 'Message sent to both teams on Discord.' : $r['message'], $r['ok'] ? 'ok' : 'error');
+                    $match = get_match($tid, $matchId);
+                    $r = discord_notify_match($tournament, $match, $message, $to);
+                    $who = match ($to) {
+                        'team1' => $match['team1_name'],
+                        'team2' => $match['team2_name'],
+                        default => 'both teams',
+                    };
+                    flash($r['ok'] ? "Message sent to {$who} on Discord." : $r['message'], $r['ok'] ? 'ok' : 'error');
                 }
                 $back .= '#m' . $matchId;
                 break;

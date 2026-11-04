@@ -357,3 +357,4 @@ pre.code { background: var(--surface-2); padding: 0.8rem; border-radius: 8px; ov
 .discord-notify input { font-size: 0.9rem; }
 @media (max-width: 560px) { .discord-in { width: 100px; } }
 .discord-card ~ * label.check input, label.check input[type="checkbox"] { flex: none; }
+.discord-notify select { width: auto; flex: none; font-size: 0.9rem; }
