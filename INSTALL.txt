@@ -1,0 +1,129 @@
+TOURNEY – INSTALLATION
+======================
+
+Two ways to run it. Pick one:
+
+  A) Your own Debian server  -> one script does everything (recommended)
+  B) A webhotel (shared hosting with PHP + MySQL)
+
+Needs PHP 8.1 or newer and MySQL or MariaDB. No Docker.
+
+
+=====================================================================
+A) DEBIAN SERVER (Debian 12 "bookworm" or 13 "trixie")
+=====================================================================
+
+What gets installed (all from Debian's own packages):
+  apache2            the web server
+  php + libapache2-mod-php + php-mysql + php-mbstring
+                     PHP and its MySQL driver
+  mariadb-server     the database (Debian's version of MySQL – works the same)
+
+1. Copy the zip to the server, for example with WinSCP or:
+       scp tourney.zip user@SERVER-IP:~
+
+2. On the server:
+       sudo apt install -y unzip
+       unzip tourney.zip
+       cd tourney
+       sudo bash install-debian.sh
+
+   The script installs the packages above, creates the database with a
+   random password, copies the site to /var/www/tourney, sets up Apache
+   and prints the address to open.
+
+3. Open  http://SERVER-IP/  in a browser and create your admin account.
+   (The database step is already done by the script.)
+
+Where things are:
+  /var/www/tourney/public         the website
+  /var/www/tourney/public/uploads your logo and background image
+  /var/www/tourney/app            the code + config.php (NOT reachable from the web)
+  /var/log/apache2/tourney-error.log   errors, if something breaks
+
+Updating to a new version:
+  Unzip the new version and run  sudo bash install-debian.sh  again.
+  Your database, accounts, logo and colors are kept.
+
+Backup:
+  sudo mysqldump tourney > tourney-backup.sql
+Restore:
+  sudo mysql tourney < tourney-backup.sql
+
+Doing it by hand instead of the script (same result):
+  sudo apt install -y apache2 mariadb-server php libapache2-mod-php php-mysql php-mbstring
+  sudo mysql -e "CREATE DATABASE tourney CHARACTER SET utf8mb4;
+                 CREATE USER 'tourney'@'localhost' IDENTIFIED BY 'pick-a-password';
+                 GRANT ALL ON tourney.* TO 'tourney'@'localhost';"
+  Copy the files to /var/www/html/ (or a subfolder), make sure Apache allows
+  .htaccess (AllowOverride All), make the uploads/ folder writable:
+      sudo chown -R www-data:www-data /var/www/html/uploads
+  then open the site and fill in the database details in the setup page.
+
+HTTPS (only if the server has a real domain name pointing to it):
+  sudo apt install -y certbot python3-certbot-apache
+  sudo certbot --apache -d tournament.yourdomain.fi
+For a LAN party on a local network, plain http:// is fine.
+
+
+=====================================================================
+B) WEBHOTEL (shared hosting)
+=====================================================================
+
+1. CREATE A DATABASE
+   In the hosting control panel, open "MySQL Databases":
+   create a database, create a user, and add the user to the database
+   with ALL PRIVILEGES. Write down the names and the password.
+
+2. UPLOAD
+   Upload EVERYTHING in this folder (including the hidden .htaccess files)
+   to public_html/ or a subfolder like public_html/turnaus/.
+   You don't need install-debian.sh or INSTALL.txt on the webhotel.
+   Tip: in FileZilla, turn on Server -> "Force showing hidden files".
+
+3. RUN THE SETUP
+   Open your site address. It takes you to the setup page:
+   - Step 1: the database details. It creates the tables and writes app/config.php.
+   - Step 2: your admin account.
+
+4. CHECK THE PROTECTION
+   Open https://yourdomain.fi/app/config.php – you should get "403 Forbidden".
+
+
+=====================================================================
+AFTER INSTALLING
+=====================================================================
+
+Appearance (top bar, admins): upload your logo (PNG with transparent
+background works best) and a background image, and pick colors. The
+"Liftup" preset uses the Liftup LAN colors.
+
+Users (top bar, admins): add organizers and scorekeepers.
+
+Live scores: press "▶ Live" when a match starts. After that every score
+change (typing, or the + / − buttons) saves by itself, and the TV
+dashboard shows it within 5 seconds. Press "✓ Finished" at the end.
+
+
+PROBLEMS?
+---------
+"Could not connect" in the setup
+    Check the database name, user and password. On cPanel both names get
+    your account name in front (myacct_tourney). Host is usually "localhost".
+
+"That file is bigger than this server allows" when uploading a logo
+    Make the image smaller. (The Debian script already raises the limit to 8 MB.)
+
+"Could not save the file" when uploading
+    The uploads/ folder must be writable by the web server:
+        sudo chown -R www-data:www-data /var/www/tourney/public/uploads
+
+Forgot your admin password and can't sign in
+    Another admin can make you a reset link on the Users page. If you are
+    the only admin, on the server run:
+        sudo mysql tourney -e "DELETE FROM users"
+    and open the site: it asks you to create a new admin. Tournaments are kept.
+
+Blank page or "Something went wrong"
+    Look at /var/log/apache2/tourney-error.log (Debian) or the error log in
+    your hosting control panel.

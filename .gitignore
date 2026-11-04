@@ -1,0 +1,5 @@
+# Asennuskohtaiset tiedostot – eivät kuulu repoon
+app/config.php
+app/sessions/
+uploads/*
+!uploads/.htaccess
