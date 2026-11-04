@@ -102,6 +102,16 @@ function migrate_columns(PDO $pdo): void
     $add = [
         // Discord username or ID of a player, used to give team roles in Discord.
         ['players', 'discord', 'VARCHAR(100) NULL AFTER number'],
+        // Map ban links: each team gets its own (never shown on public pages).
+        ['matches', 'mapban1', 'VARCHAR(500) NULL AFTER status'],
+        ['matches', 'mapban2', 'VARCHAR(500) NULL AFTER mapban1'],
+        // Self-registration (register.php): off by default, set per tournament.
+        ['tournaments', 'reg_open', 'TINYINT(1) NOT NULL DEFAULT 0 AFTER is_public'],
+        ['tournaments', 'reg_code', 'VARCHAR(50) NULL AFTER reg_open'],
+        ['tournaments', 'reg_new_teams', 'TINYINT(1) NOT NULL DEFAULT 0 AFTER reg_code'],
+        ['tournaments', 'reg_max_players', 'INT NOT NULL DEFAULT 5 AFTER reg_new_teams'],
+        ['tournaments', 'reg_discord', 'TINYINT(1) NOT NULL DEFAULT 1 AFTER reg_max_players'],
+        ['players', 'self_registered', 'TINYINT(1) NOT NULL DEFAULT 0 AFTER discord'],
     ];
     foreach ($add as [$table, $column, $definition]) {
         $exists = $pdo->query("SHOW COLUMNS FROM `{$table}` LIKE " . $pdo->quote($column))->fetchColumn();

@@ -21,6 +21,7 @@ page_header($t['name']);
     <p class="muted"><?= e(fmt_date($t['start_time'])) ?> · starts <?= e(fmt_time($t['start_time'])) ?></p>
   </div>
   <div class="actions">
+    <?php if ((int) ($t['reg_open'] ?? 0) === 1): ?><a class="btn primary" href="<?= b() ?>/register.php?id=<?= $tid ?>">✍️ Register</a><?php endif; ?>
     <a class="btn" href="<?= b() ?>/dashboard.php?id=<?= $tid ?>">📺 Live dashboard</a>
     <?php if (is_logged_in()): ?><a class="btn ghost" href="<?= b() ?>/admin/tournament.php?id=<?= $tid ?>">Manage</a><?php endif; ?>
   </div>

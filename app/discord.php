@@ -21,6 +21,7 @@ const DISCORD_SETTINGS = [
     'discord_result_channel'  => '',   // Discord channel ID for results; empty = bot's default channel
     'discord_create_channels' => '1',  // team sync creates a text + voice channel per team
     'discord_attach_server'   => '1',  // attach the bot server whose name equals the court name
+    'discord_mapban_on_live'  => '1',  // the Live message to each team includes its own map ban link
 ];
 
 function discord_settings(): array
@@ -190,6 +191,41 @@ function discord_sync_teams(int $tid): array
     return ['ok' => true, 'message' => $msg, 'missing' => $missing];
 }
 
+/**
+ * Looks a Discord name up on the bot's server (username, display name or user ID).
+ * Returns ['checked' => bool, 'found' => bool, 'username' => string].
+ * checked = false when the bot can't be asked (not set up, down, or an old bot version):
+ * the caller then accepts the name as typed.
+ */
+function discord_resolve_member(string $name): array
+{
+    $none = ['checked' => false, 'found' => false, 'username' => ''];
+    if (!discord_enabled()) {
+        return $none;
+    }
+    $r = discord_request('POST', '/members/resolve', ['users' => [$name]], 4);
+    if (!$r['ok'] || !is_array($r['data']) || !isset($r['data'][0])) {
+        return $none;
+    }
+    $row = $r['data'][0];
+    return ['checked' => true, 'found' => !empty($row['found']), 'username' => (string) ($row['username'] ?? '')];
+}
+
+/** Gives one player the team role right away (creates the team on Discord if needed). */
+function discord_add_player(string $teamName, string $discord): array
+{
+    $r = discord_request('POST', '/teams/import', [
+        'teams'          => [['name' => $teamName, 'members' => [$discord]]],
+        'replace'        => false,
+        'createChannels' => discord_on('discord_create_channels'),
+    ], 20);
+    if (!$r['ok']) {
+        return ['ok' => false, 'message' => $r['error']];
+    }
+    $row = $r['data'][0] ?? [];
+    return ['ok' => !empty($row['added']), 'message' => empty($row['added']) ? 'not found on the Discord server' : ''];
+}
+
 /** Removes this tournament's teams (roles + channels) from Discord. */
 function discord_remove_teams(int $tid): array
 {
@@ -215,7 +251,12 @@ function discord_remove_teams(int $tid): array
 function discord_announce(array $payload): array
 {
     $r = discord_request('POST', '/announcements', $payload, 8);
-    return ['ok' => $r['ok'], 'message' => $r['ok'] ? 'Sent to Discord.' : 'Discord: ' . $r['error']];
+    $error = $r['error'];
+    // A bot from before the Tourney integration ignores "teams" and answers with its generic "pick a channel" error.
+    if (!$r['ok'] && !empty($payload['teams']) && str_contains($error, 'Valitse vähintään yksi kanava')) {
+        $error .= ' – The bot is probably an older version that cannot message teams yet: update the bot (lanibot26) and restart it.';
+    }
+    return ['ok' => $r['ok'], 'message' => $r['ok'] ? 'Sent to Discord.' : 'Discord: ' . $error];
 }
 
 /** "Lohko A · kierros 2" / "FINAALI" + court + time, for message bodies. */
@@ -272,6 +313,105 @@ function discord_notify_match(array $tournament, array $m, string $message, stri
     return discord_to_teams($tournament, $m, $title, $body, '#5865f2', $to);
 }
 
+/* ---------- Map ban: a separate link for each team ---------- */
+
+/**
+ * Own text channel of each team on Discord, from the bot: ['team name' => channel ID or null].
+ * Returns null when the bot can't be asked.
+ */
+function discord_team_channels(array $names): ?array
+{
+    $r = discord_request('GET', '/teams', null, 4);
+    if (!$r['ok'] || !is_array($r['data'])) {
+        return null;
+    }
+    $byName = [];
+    foreach ($r['data'] as $team) {
+        if (isset($team['name'])) {
+            $byName[strtolower((string) $team['name'])] = $team['textChannelId'] ?? null;
+        }
+    }
+    $out = [];
+    foreach ($names as $name) {
+        $out[$name] = $byName[strtolower($name)] ?? null;
+    }
+    return $out;
+}
+
+/** Map ban link of one side of a match ('team1' / 'team2'), or ''. */
+function mapban_link(array $m, string $side): string
+{
+    return trim((string) ($m[$side === 'team1' ? 'mapban1' : 'mapban2'] ?? ''));
+}
+
+/**
+ * Sends a message that only one team may see (its own map ban link) to that team's OWN channel.
+ * Never falls back to a shared channel: if the team has no own channel, nothing is sent.
+ */
+function discord_private_to_team(array $m, string $side, ?array $channels, string $title, string $body, string $color): array
+{
+    $team = $m[$side . '_name'];
+    if ($channels === null) {
+        return ['ok' => false, 'message' => 'Discord: the bot could not be reached, so the map ban link of ' . $team . ' was not sent.'];
+    }
+    $channelId = $channels[$team] ?? null;
+    if (!$channelId) {
+        return ['ok' => false, 'message' => "Discord: {$team} has no own team channel, so its map ban link was not sent "
+            . '(it would have been visible to others). Sync the teams with channels first.'];
+    }
+    $payload = [
+        'channelIds' => [$channelId],
+        'mention'    => 'team',
+        'title'      => $title,
+        'body'       => $body,
+        'color'      => $color,
+    ];
+    if (discord_on('discord_attach_server') && !empty($m['court_name'])) {
+        $payload['serverNames'] = [$m['court_name']];
+    }
+    return discord_announce($payload);
+}
+
+/** Body text: the team's own map ban link + a reminder not to share it. */
+function discord_mapban_text(string $link): string
+{
+    return "🗺️ **Teidän map ban -linkki:** {$link}\nLinkki on vain teidän tiimille. Älä jaa sitä vastustajalle.";
+}
+
+/**
+ * Sends each team ONLY its own map ban link. Teams without a link are skipped.
+ * Returns ['ok', 'message'].
+ */
+function discord_send_mapbans(array $tournament, array $m): array
+{
+    $sides = array_values(array_filter(['team1', 'team2'], fn($s) => mapban_link($m, $s) !== ''));
+    if (!$sides) {
+        return ['ok' => false, 'message' => 'Add at least one map ban link first.'];
+    }
+    $channels = discord_team_channels([$m['team1_name'], $m['team2_name']]);
+    $sent = [];
+    $errors = [];
+    foreach ($sides as $side) {
+        $other = $side === 'team1' ? 'team2' : 'team1';
+        $r = discord_private_to_team(
+            $m, $side, $channels,
+            '🗺️ Map ban: ' . $m[$side . '_name'] . ' vs ' . $m[$other . '_name'],
+            discord_mapban_text(mapban_link($m, $side)) . "\n\n" . discord_match_line($m) . "\n*" . $tournament['name'] . '*',
+            '#9b59b6'
+        );
+        if ($r['ok']) {
+            $sent[] = $m[$side . '_name'];
+        } else {
+            $errors[] = $r['message'];
+        }
+    }
+    $msg = $sent ? 'Map ban link sent to ' . implode(' and ', $sent) . ' (each only its own).' : '';
+    if ($errors) {
+        $msg = trim($msg . ' ' . implode(' ', $errors));
+    }
+    return ['ok' => !$errors, 'message' => $msg];
+}
+
 /**
  * Called after a match was saved. Announces only on a status CHANGE,
  * so live score autosaves never spam Discord.
@@ -285,12 +425,29 @@ function discord_on_match_change(array $tournament, array $before, array $after)
     $results = [];
 
     if ($after['status'] === 'live' && discord_on('discord_auto_live')) {
-        $results[] = discord_to_teams(
-            $tournament, $after,
-            '⚔️ Ottelu alkaa: ' . $after['team1_name'] . ' vs ' . $after['team2_name'],
-            discord_match_line($after) . "\n*" . $tournament['name'] . '*',
-            '#e74c3c'
-        );
+        $title = '⚔️ Ottelu alkaa: ' . $after['team1_name'] . ' vs ' . $after['team2_name'];
+        $body = discord_match_line($after) . "\n*" . $tournament['name'] . '*';
+        $withLinks = discord_on('discord_mapban_on_live')
+            && (mapban_link($after, 'team1') !== '' || mapban_link($after, 'team2') !== '');
+        if (!$withLinks) {
+            $results[] = discord_to_teams($tournament, $after, $title, $body, '#e74c3c');
+        } else {
+            // Each team gets its own message: the shared start info + only its own map ban link.
+            $channels = discord_team_channels([$after['team1_name'], $after['team2_name']]);
+            foreach (['team1', 'team2'] as $side) {
+                $link = mapban_link($after, $side);
+                if ($link === '') {
+                    $results[] = discord_to_teams($tournament, $after, $title, $body, '#e74c3c', $side);
+                    continue;
+                }
+                $r = discord_private_to_team($after, $side, $channels, $title, discord_mapban_text($link) . "\n\n" . $body, '#e74c3c');
+                if (!$r['ok']) {
+                    // Still tell the team the match started, just without the private link.
+                    discord_to_teams($tournament, $after, $title, $body, '#e74c3c', $side);
+                }
+                $results[] = $r;
+            }
+        }
     }
 
     if ($after['status'] === 'finished') {

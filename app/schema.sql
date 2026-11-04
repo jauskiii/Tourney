@@ -12,6 +12,11 @@ CREATE TABLE IF NOT EXISTS tournaments (
     points_draw     INT          NOT NULL DEFAULT 1,
     points_loss     INT          NOT NULL DEFAULT 0,
     is_public       TINYINT(1)   NOT NULL DEFAULT 1,
+    reg_open        TINYINT(1)   NOT NULL DEFAULT 0,
+    reg_code        VARCHAR(50)  NULL,
+    reg_new_teams   TINYINT(1)   NOT NULL DEFAULT 0,
+    reg_max_players INT          NOT NULL DEFAULT 5,
+    reg_discord     TINYINT(1)   NOT NULL DEFAULT 1,
     created_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -42,6 +47,7 @@ CREATE TABLE IF NOT EXISTS players (
     name            VARCHAR(100) NOT NULL,
     number          VARCHAR(10)  NULL,
     discord         VARCHAR(100) NULL,
+    self_registered TINYINT(1)   NOT NULL DEFAULT 0,
     CONSTRAINT fk_players_team FOREIGN KEY (team_id)
         REFERENCES teams(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -69,6 +75,8 @@ CREATE TABLE IF NOT EXISTS matches (
     score2          INT          NULL,
     winner_team_id  INT          NULL,
     status          ENUM('scheduled','live','finished') NOT NULL DEFAULT 'scheduled',
+    mapban1         VARCHAR(500) NULL,
+    mapban2         VARCHAR(500) NULL,
     KEY idx_matches_time (tournament_id, start_time),
     CONSTRAINT fk_matches_tournament FOREIGN KEY (tournament_id)
         REFERENCES tournaments(id) ON DELETE CASCADE,

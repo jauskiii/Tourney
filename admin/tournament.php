@@ -147,6 +147,17 @@ function render_discord_notify(array $m, string $tab): void
   </select>
   <button class="btn small ghost" title="Sends to the team channels and pings the team roles">📣 Send</button>
 </form>
+<form method="post" class="mapban-form row-form tight">
+  <?= form_base('save_mapban', $tab) ?>
+  <input type="hidden" name="match_id" value="<?= (int) $m['id'] ?>">
+  <span class="mapban-label small" title="Each team only ever gets its own link, on its own team channel">🗺️ Map ban</span>
+  <input type="url" name="mapban1" value="<?= e($m['mapban1'] ?? '') ?>" maxlength="500" class="grow"
+         placeholder="Link for <?= e($m['team1_name']) ?>" aria-label="Map ban link for <?= e($m['team1_name']) ?>">
+  <input type="url" name="mapban2" value="<?= e($m['mapban2'] ?? '') ?>" maxlength="500" class="grow"
+         placeholder="Link for <?= e($m['team2_name']) ?>" aria-label="Map ban link for <?= e($m['team2_name']) ?>">
+  <button class="btn small ghost" title="Save the links<?= discord_on('discord_mapban_on_live') ? ' (sent with the Live message)' : '' ?>">Save</button>
+  <button class="btn small ghost" name="send" value="1" title="Save and send each team its own link now">📣 Send links</button>
+</form>
 <?php
 }
 
@@ -235,6 +246,39 @@ page_header($t['name'] . ' – Admin', ['nav' => 'admin']);
 <?php elseif (can('settings_manage', $me)): ?>
 <p class="muted small">Tip: connect the <a href="<?= b() ?>/admin/discord.php">Discord bot</a> to give team roles and channels automatically.</p>
 <?php endif; ?>
+<?php $regUrl = full_url('/register.php?id=' . $tid); $regOpen = (int) $t['reg_open'] === 1; ?>
+<div class="card reg-card">
+  <h2>Self-registration <span class="badge <?= $regOpen ? 'badge-done' : '' ?>"><?= $regOpen ? 'open' : 'off' ?></span></h2>
+  <p class="muted small">Optional. When open, players use the link below: they pick their team and type their name and
+    Discord username, and land straight in the team<?= discord_enabled() ? ' (with the Discord team role)' : '' ?>.
+    You can still add and fix players by hand below, for example from a Forms sheet.</p>
+  <form method="post" class="grid-form">
+    <?= form_base('update_registration', $tab) ?>
+    <label class="check span2"><input type="checkbox" name="reg_open" <?= $regOpen ? 'checked' : '' ?>> Registration is open</label>
+    <label>Registration code <span class="muted small">(optional, players must type it)</span>
+      <input name="reg_code" value="<?= e($t['reg_code'] ?? '') ?>" maxlength="50" autocomplete="off"></label>
+    <label>Max players per team <span class="muted small">(0 = no limit)</span>
+      <input type="number" name="reg_max_players" value="<?= (int) $t['reg_max_players'] ?>" min="0" max="50"></label>
+    <label class="check span2"><input type="checkbox" name="reg_new_teams" <?= (int) $t['reg_new_teams'] === 1 ? 'checked' : '' ?>>
+      Players may create a new team (only until the schedule is generated)</label>
+    <?php if (discord_enabled()): ?>
+    <label class="check span2"><input type="checkbox" name="reg_discord" <?= (int) $t['reg_discord'] === 1 ? 'checked' : '' ?>>
+      Check the Discord name on the server and give the team role right away</label>
+    <?php endif; ?>
+    <div class="span2"><button class="btn primary">Save</button></div>
+  </form>
+  <div class="row-form tight reg-link">
+    <input value="<?= e($regUrl) ?>" readonly class="grow" aria-label="Registration link" onclick="this.select()">
+    <a class="btn small ghost" href="<?= e($regUrl) ?>" target="_blank">Open ↗</a>
+    <?php if (discord_enabled()): ?>
+    <form method="post" class="inline">
+      <?= form_base('discord_post_registration', $tab) ?>
+      <button class="btn small ghost" <?= $regOpen ? '' : 'disabled title="Open the registration first"' ?>>📣 Post link to Discord</button>
+    </form>
+    <?php endif; ?>
+  </div>
+</div>
+
 <div class="card">
   <h2>Add teams</h2>
   <form method="post" class="stack">
@@ -265,7 +309,7 @@ page_header($t['name'] . ' – Admin', ['nav' => 'admin']);
     <ul class="players">
       <?php foreach ($players[$teamId] ?? [] as $p): ?>
         <li>
-          <span><?= $p['number'] !== null ? '<span class="num">#' . e($p['number']) . '</span> ' : '' ?><?= e($p['name']) ?></span>
+          <span><?= $p['number'] !== null ? '<span class="num">#' . e($p['number']) . '</span> ' : '' ?><?= e($p['name']) ?><?= !empty($p['self_registered']) ? ' <span class="self-reg" title="Registered through the registration link">✍</span>' : '' ?></span>
           <form method="post" class="inline discord-edit" title="Discord username or ID">
             <?= form_base('set_player_discord', $tab) ?>
             <input type="hidden" name="player_id" value="<?= (int) $p['id'] ?>">

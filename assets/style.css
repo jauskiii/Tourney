@@ -358,3 +358,14 @@ pre.code { background: var(--surface-2); padding: 0.8rem; border-radius: 8px; ov
 @media (max-width: 560px) { .discord-in { width: 100px; } }
 .discord-card ~ * label.check input, label.check input[type="checkbox"] { flex: none; }
 .discord-notify select { width: auto; flex: none; font-size: 0.9rem; }
+.discord-notify { margin-bottom: 0.35rem; }
+.mapban-form { margin: 0 0 0.8rem; }
+.mapban-form input { font-size: 0.9rem; min-width: 0; }
+.mapban-label { flex: none; white-space: nowrap; color: var(--muted, #8a93a6); }
+@media (max-width: 560px) { .mapban-form input { flex-basis: 100%; } }
+
+/* Self-registration */
+.hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+.reg-link { margin-top: 0.8rem; }
+.reg-link input { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.85rem; }
+.self-reg { color: var(--muted); font-size: 0.85em; }

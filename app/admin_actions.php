@@ -14,7 +14,7 @@ function handle_admin_action(array $tournament): never
     $back = url("/admin/tournament.php?id={$tid}&tab={$tab}");
 
     // Scorekeepers may only enter scores; everything else needs tournaments_manage.
-    $scoreActions = ['save_match', 'reset_match', 'discord_notify'];
+    $scoreActions = ['save_match', 'reset_match', 'discord_notify', 'save_mapban'];
     require_permission(in_array($action, $scoreActions, true) ? 'scores_enter' : 'tournaments_manage');
 
     try {
@@ -286,6 +286,62 @@ function handle_admin_action(array $tournament): never
                         default => 'both teams',
                     };
                     flash($r['ok'] ? "Message sent to {$who} on Discord." : $r['message'], $r['ok'] ? 'ok' : 'error');
+                }
+                $back .= '#m' . $matchId;
+                break;
+
+            case 'update_registration':
+                $code = post_str('reg_code', 50);
+                q('UPDATE tournaments SET reg_open = ?, reg_code = ?, reg_new_teams = ?, reg_max_players = ?, reg_discord = ? WHERE id = ?', [
+                    isset($_POST['reg_open']) ? 1 : 0,
+                    $code !== '' ? $code : null,
+                    isset($_POST['reg_new_teams']) ? 1 : 0,
+                    max(0, min(50, (int) post_int('reg_max_players', 5))),
+                    // The checkbox is only shown when the bot is connected; keep the old value otherwise.
+                    discord_enabled() ? (isset($_POST['reg_discord']) ? 1 : 0) : (int) $tournament['reg_discord'],
+                    $tid,
+                ]);
+                flash(isset($_POST['reg_open']) ? 'Registration is open. Share the link with the players.' : 'Registration settings saved (registration is closed).');
+                break;
+
+            case 'discord_post_registration':
+                $fresh = get_tournament($tid);
+                if ((int) $fresh['reg_open'] !== 1) {
+                    flash('Open the registration first.', 'error');
+                    break;
+                }
+                $body = "Ilmoittaudu turnaukseen: valitse tiimisi ja kirjoita nimesi ja Discord-käyttäjänimesi.\n\n"
+                      . '👉 ' . full_url('/register.php?id=' . $tid);
+                if (trim((string) $fresh['reg_code']) !== '') {
+                    $body .= "\n\nIlmoittautumiskoodin saat järjestäjiltä.";
+                }
+                $r = discord_announce(['title' => '✍️ Ilmoittautuminen: ' . $fresh['name'], 'body' => $body, 'color' => '#2ecc71']);
+                flash($r['ok'] ? 'Registration link posted to the bot\'s announcement channel.' : $r['message'], $r['ok'] ? 'ok' : 'error');
+                break;
+
+            case 'save_mapban':
+                $matchId = require_owned('matches', post_int('match_id'), $tid);
+                $links = [];
+                $bad = [];
+                foreach (['mapban1', 'mapban2'] as $field) {
+                    $link = post_str($field, 500);
+                    if ($link !== '' && !preg_match('~^https?://\S+$~i', $link)) {
+                        $bad[] = $link;
+                        $link = '';
+                    }
+                    $links[$field] = $link !== '' ? $link : null;
+                }
+                if ($bad) {
+                    flash('A map ban link must start with http:// or https://. Not saved: ' . implode(', ', $bad), 'error');
+                    $back .= '#m' . $matchId;
+                    break;
+                }
+                q('UPDATE matches SET mapban1 = ?, mapban2 = ? WHERE id = ?', [$links['mapban1'], $links['mapban2'], $matchId]);
+                if (($_POST['send'] ?? '') === '1') {
+                    $r = discord_send_mapbans($tournament, get_match($tid, $matchId));
+                    flash($r['message'], $r['ok'] ? 'ok' : 'error');
+                } else {
+                    flash('Map ban links saved.' . (discord_on('discord_mapban_on_live') ? ' Each team gets its own link when the match goes Live.' : ''));
                 }
                 $back .= '#m' . $matchId;
                 break;

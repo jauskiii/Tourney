@@ -20,7 +20,7 @@ function page_header(string $title, array $opts = []): void
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title><?= e($title) ?> · <?= e($appName) ?></title>
-<link rel="stylesheet" href="<?= b() ?>/assets/style.css?v=7">
+<link rel="stylesheet" href="<?= b() ?>/assets/style.css?v=8">
 <?php $theme = $safe ? theme_defaults() : theme(); ?>
 <?php if ($theme['logo']): ?><link rel="icon" href="<?= e($theme['logo']) ?>"><?php endif; ?>
 <?= $safe ? '' : theme_css() ?>
