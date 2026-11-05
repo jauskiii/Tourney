@@ -111,6 +111,7 @@ function migrate_columns(PDO $pdo): void
         ['tournaments', 'reg_new_teams', 'TINYINT(1) NOT NULL DEFAULT 0 AFTER reg_code'],
         ['tournaments', 'reg_max_players', 'INT NOT NULL DEFAULT 5 AFTER reg_new_teams'],
         ['tournaments', 'reg_discord', 'TINYINT(1) NOT NULL DEFAULT 1 AFTER reg_max_players'],
+        ['tournaments', 'reg_channel', 'VARCHAR(30) NULL AFTER reg_discord'],
         ['players', 'self_registered', 'TINYINT(1) NOT NULL DEFAULT 0 AFTER discord'],
     ];
     foreach ($add as [$table, $column, $definition]) {

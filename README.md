@@ -85,7 +85,9 @@ pick their team and type their name and Discord username. Settings per tournamen
 
 If an organizer already typed the player's name without a Discord name, that row is filled in instead of a new one.
 The same Discord name can't be in two teams. Self-registered players have a ✍ mark on the admin page and can be
-edited or removed like any other. **📣 Post link to Discord** posts the link to the bot's announcement channel.
+edited or removed like any other. **📣 Post link to Discord** posts the link to the channel picked in the card
+(*Discord channel for the registration link*), or to the bot's default channel if none is picked. Channels are
+picked from a list read from the bot; the results channel on the Discord settings page works the same way.
 Collecting names some other way (e.g. a Forms sheet) and typing them in by hand works exactly as before.
 
 **Upgrading an existing install:** copy the changed files below. The new columns are added
@@ -95,7 +97,7 @@ automatically on the next page load (MySQL 8 and MariaDB).
 register.php           new – self-registration page
 app/discord.php        new – the bot client
 admin/discord.php      new – settings page
-app/db.php             column migration (players.discord, matches.mapban1/2, tournaments.reg_*)
+app/db.php             column migration (players.discord, matches.mapban1/2, tournaments.reg_* incl. reg_channel)
 app/schema.sql         the same columns for new installs
 app/bootstrap.php      loads discord.php
 app/tournament.php     get_match()

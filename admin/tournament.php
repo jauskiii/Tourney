@@ -262,6 +262,8 @@ page_header($t['name'] . ' – Admin', ['nav' => 'admin']);
     <label class="check span2"><input type="checkbox" name="reg_new_teams" <?= (int) $t['reg_new_teams'] === 1 ? 'checked' : '' ?>>
       Players may create a new team (only until the schedule is generated)</label>
     <?php if (discord_enabled()): ?>
+    <label class="span2">Discord channel for the registration link <span class="muted small">(where 📣 Post link to Discord sends it)</span>
+      <?= discord_channel_select('reg_channel', $t['reg_channel'] ?? '', "— the bot's default announcement channel —") ?></label>
     <label class="check span2"><input type="checkbox" name="reg_discord" <?= (int) $t['reg_discord'] === 1 ? 'checked' : '' ?>>
       Check the Discord name on the server and give the team role right away</label>
     <?php endif; ?>

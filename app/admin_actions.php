@@ -292,13 +292,15 @@ function handle_admin_action(array $tournament): never
 
             case 'update_registration':
                 $code = post_str('reg_code', 50);
-                q('UPDATE tournaments SET reg_open = ?, reg_code = ?, reg_new_teams = ?, reg_max_players = ?, reg_discord = ? WHERE id = ?', [
+                $regChannel = discord_enabled() && array_key_exists('reg_channel', $_POST) ? post_channel_id('reg_channel') : (string) ($tournament['reg_channel'] ?? '');
+                q('UPDATE tournaments SET reg_open = ?, reg_code = ?, reg_new_teams = ?, reg_max_players = ?, reg_discord = ?, reg_channel = ? WHERE id = ?', [
                     isset($_POST['reg_open']) ? 1 : 0,
                     $code !== '' ? $code : null,
                     isset($_POST['reg_new_teams']) ? 1 : 0,
                     max(0, min(50, (int) post_int('reg_max_players', 5))),
                     // The checkbox is only shown when the bot is connected; keep the old value otherwise.
                     discord_enabled() ? (isset($_POST['reg_discord']) ? 1 : 0) : (int) $tournament['reg_discord'],
+                    $regChannel !== '' ? $regChannel : null,
                     $tid,
                 ]);
                 flash(isset($_POST['reg_open']) ? 'Registration is open. Share the link with the players.' : 'Registration settings saved (registration is closed).');
@@ -315,8 +317,12 @@ function handle_admin_action(array $tournament): never
                 if (trim((string) $fresh['reg_code']) !== '') {
                     $body .= "\n\nIlmoittautumiskoodin saat järjestäjiltä.";
                 }
-                $r = discord_announce(['title' => '✍️ Ilmoittautuminen: ' . $fresh['name'], 'body' => $body, 'color' => '#2ecc71']);
-                flash($r['ok'] ? 'Registration link posted to the bot\'s announcement channel.' : $r['message'], $r['ok'] ? 'ok' : 'error');
+                $payload = ['title' => '✍️ Ilmoittautuminen: ' . $fresh['name'], 'body' => $body, 'color' => '#2ecc71'];
+                if (!empty($fresh['reg_channel'])) {
+                    $payload['channelId'] = $fresh['reg_channel'];
+                }
+                $r = discord_announce($payload);
+                flash($r['ok'] ? 'Registration link posted to Discord.' : $r['message'] . ' (Teams & players → Self-registration → Discord channel.)', $r['ok'] ? 'ok' : 'error');
                 break;
 
             case 'save_mapban':

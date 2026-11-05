@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS tournaments (
     reg_new_teams   TINYINT(1)   NOT NULL DEFAULT 0,
     reg_max_players INT          NOT NULL DEFAULT 5,
     reg_discord     TINYINT(1)   NOT NULL DEFAULT 1,
+    reg_channel     VARCHAR(30)  NULL,
     created_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

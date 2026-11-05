@@ -24,7 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             setting_set('discord_bot_token', '');
         }
         $channel = post_str('discord_result_channel', 30);
-        setting_set('discord_result_channel', preg_match('/^\d{17,20}$/', $channel) ? $channel : '');
+        setting_set('discord_result_channel', preg_match('/^\d{1,25}$/', $channel) ? $channel : '');
         foreach (['discord_auto_live', 'discord_mapban_on_live', 'discord_auto_result', 'discord_auto_champion', 'discord_create_channels', 'discord_attach_server'] as $key) {
             setting_set($key, isset($_POST[$key]) ? '1' : '0');
         }
@@ -87,8 +87,8 @@ page_header('Discord', ['nav' => 'discord']);
         <span>When a match is <strong>✓ Finished</strong>, post the result</span></label>
       <label class="check"><input type="checkbox" name="discord_auto_champion" <?= $s['discord_auto_champion'] === '1' ? 'checked' : '' ?>>
         <span>When the final is finished, announce the champion (@here)</span></label>
-      <label>Results channel ID <span class="muted small">(empty = the bot's default announcement channel)</span>
-        <input name="discord_result_channel" value="<?= e($s['discord_result_channel']) ?>" placeholder="123456789012345678" inputmode="numeric" maxlength="20">
+      <label>Results channel <span class="muted small">(empty = the bot's default announcement channel)</span>
+        <?= discord_enabled() ? discord_channel_select('discord_result_channel', $s['discord_result_channel'], "— the bot's default announcement channel —") : '<input name="discord_result_channel" value="' . e($s['discord_result_channel']) . '" placeholder="123456789012345678" inputmode="numeric" maxlength="20">' ?>
       </label>
 
       <h3>Teams</h3>

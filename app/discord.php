@@ -138,6 +138,54 @@ function discord_test(): array
     return $r;
 }
 
+/**
+ * Text channels of the Discord server, from the bot: [['id' => …, 'name' => …, 'parent' => …], …].
+ * Null when the bot can't be asked. Cached for the request.
+ */
+function discord_channels(): ?array
+{
+    static $cache = false;
+    if ($cache !== false) {
+        return $cache;
+    }
+    $r = discord_request('GET', '/guild', null, 3);
+    $cache = ($r['ok'] && isset($r['data']['channels']) && is_array($r['data']['channels'])) ? $r['data']['channels'] : null;
+    return $cache;
+}
+
+/**
+ * A channel picker: a <select> of the server's text channels when the bot answers,
+ * otherwise a plain input for the channel ID. $emptyLabel = text of the "no channel" choice.
+ */
+function discord_channel_select(string $name, ?string $selected, string $emptyLabel): string
+{
+    $selected = (string) $selected;
+    $channels = discord_channels();
+    if ($channels === null) {
+        return '<input name="' . e($name) . '" value="' . e($selected) . '" placeholder="Channel ID, e.g. 123456789012345678" inputmode="numeric" maxlength="20">';
+    }
+    $html = '<select name="' . e($name) . '"><option value="">' . e($emptyLabel) . '</option>';
+    $found = $selected === '';
+    foreach ($channels as $c) {
+        $id = (string) ($c['id'] ?? '');
+        $sel = $id === $selected ? ' selected' : '';
+        $found = $found || $sel !== '';
+        $label = '#' . ($c['name'] ?? $id) . (!empty($c['parent']) ? ' (' . $c['parent'] . ')' : '');
+        $html .= '<option value="' . e($id) . '"' . $sel . '>' . e($label) . '</option>';
+    }
+    if (!$found) {
+        $html .= '<option value="' . e($selected) . '" selected>' . e($selected) . ' (channel not found)</option>';
+    }
+    return $html . '</select>';
+}
+
+/** A Discord channel ID from a form field, or '' (IDs are 17–20 digits). */
+function post_channel_id(string $key): string
+{
+    $v = post_str($key, 30);
+    return preg_match('/^\d{1,25}$/', $v) ? $v : '';
+}
+
 /* ---------- Teams ---------- */
 
 /** Teams of a tournament with the Discord names of their players. */
@@ -253,6 +301,10 @@ function discord_announce(array $payload): array
     $r = discord_request('POST', '/announcements', $payload, 8);
     $error = $r['error'];
     // A bot from before the Tourney integration ignores "teams" and answers with its generic "pick a channel" error.
+    if (!$r['ok'] && empty($payload['teams']) && empty($payload['channelId']) && empty($payload['channelIds'])
+        && str_contains($error, 'Valitse vähintään yksi kanava')) {
+        $error = 'no channel was chosen and the bot has no default announcement channel. Pick the channel here in Tourney.';
+    }
     if (!$r['ok'] && !empty($payload['teams']) && str_contains($error, 'Valitse vähintään yksi kanava')) {
         $error .= ' – The bot is probably an older version that cannot message teams yet: update the bot (lanibot26) and restart it.';
     }
